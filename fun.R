@@ -52,7 +52,7 @@ createTreeRec<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1, s
   return(node)
 }
 
-# Podbobna ako predchodza funkcia, akorat sa data vzdy kopituju, ale dokaze rozdelit data podla skupin (zatial neotestovana)
+# Podbobna ako predchodza funkcia, akorat sa data vzdy kopituju, ale dokaze rozdelit data podla skupin
 createTreeRec2<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1){
   
   pocetPremenych= ncol(data) -1
@@ -73,9 +73,9 @@ createTreeRec2<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1){
   #nastavenie hodnot pre kazde rozdelenie
   for (i in 1:pocetPremenych) {
     indexMatrix[i,] = order(data[,i+1])
-    if(is.character(data[1,i])){
+    if(is.character(data[1,i+1])){
       for (j in (minGroupe):(pocetPozorovani-minGroupe)) {
-        filter = data[indexMatrix[i,1:pocetPozorovani],i]
+        filter = data[indexMatrix[i,1:pocetPozorovani],i+1]
         j_offset = j+1-minGroupe
         prvaPolovica = data[indexMatrix[i,1:pocetPozorovani][filter==filter[j_offset]],1]
         druhaPolovica = data[indexMatrix[i,1:pocetPozorovani][filter!=filter[j_offset]],1]
@@ -101,6 +101,11 @@ createTreeRec2<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1){
         separate = j+(-1+minGroupe)
       }
     } 
+  }
+  
+  #ukoncenie vetvenia(toto vetvenie by nevytvorilo lepsi vysledok)
+  if(min >= fun(data[,1], node$value)){
+    return(node)
   }
   
   #nastavenie vetvenia
@@ -171,16 +176,20 @@ prediction <-function(model, data){
   return(apply(data,1, FUN = function(x)predictionRec(model,x)))
 }
 
+path <- 'https://raw.githubusercontent.com/guru99-edu/R-Programming/master/titanic_data.csv'
+titanic <-read.csv(path)
+titanic[1,]
 
-#zatial som nenasiel ine data s ktorymi by som to porovnal
-test= data.frame(1:20)
-test$X1 = 1:20
-test$Y = c(0,0,0,0,5,20,100,100,100,100,70,65,60,55,50,45,10,0,0,0)
+titanicRand = sample(titanic)
+train = titanicRand[1:1000,]
+test = titanicRand[1001:1200,]
 
-model = createTree(Y ~ X1, test,fun=sse,maxK=50,minGroupe = 4)
+model = createTree(survived ~ sex  + age + pclass , train,fun=sse,maxK=10,minGroupe = 5)
+model
 
-prediction(model, test)
+vysledok  = prediction(model, test)
+pravdepodobnost = 0.5
+vysledok[vysledok<pravdepodobnost] = 0
+vysledok[vysledok>=pravdepodobnost] = 1
 
-mse(test$Y,prediction(model, test))
-
-
+mse(test$survived,vysledok)
