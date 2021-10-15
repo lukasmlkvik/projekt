@@ -52,6 +52,75 @@ createTreeRec<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1, s
   return(node)
 }
 
+# Podbobna ako predchodza funkcia, akorat sa data vzdy kopituju, ale dokaze rozdelit data podla skupin (zatial neotestovana)
+createTreeRec2<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1){
+  
+  pocetPremenych= ncol(data) -1
+  pocetPozorovani= nrow(data)
+  
+  node=data.frame(1)
+  node$value = mean(data[,1])
+  
+  #podmienky pre ukoncenie vytvarania dalsieho vetvenia
+  if(err >= fun(data[,1], node$value) || pocetPozorovani <= minGroupe*2 || maxK == 0){
+    return(node)
+  }
+  
+  #hodnoty chyby zo zadanej funkcie, pri rozdeleni dat na pozicii i(index 1 rozdeli data na minGroupe a zvysok)
+  values = matrix(nrow = pocetPremenych, ncol = pocetPozorovani-2*minGroupe+1)
+  indexMatrix = matrix(nrow = pocetPremenych, ncol = pocetPozorovani)
+  
+  #nastavenie hodnot pre kazde rozdelenie
+  for (i in 1:pocetPremenych) {
+    indexMatrix[i,] = order(data[,i+1])
+    if(is.character(data[1,i])){
+      for (j in (minGroupe):(pocetPozorovani-minGroupe)) {
+        filter = data[indexMatrix[i,1:pocetPozorovani],i]
+        j_offset = j+1-minGroupe
+        prvaPolovica = data[indexMatrix[i,1:pocetPozorovani][filter==filter[j_offset]],1]
+        druhaPolovica = data[indexMatrix[i,1:pocetPozorovani][filter!=filter[j_offset]],1]
+        values[i,j_offset] = fun(prvaPolovica,mean(prvaPolovica)) + fun(druhaPolovica, mean(druhaPolovica))
+      }
+    }else{
+      for (j in (minGroupe):(pocetPozorovani-minGroupe)) {
+        prvaPolovica = data[indexMatrix[i,1:j],1]
+        druhaPolovica = data[indexMatrix[i,(j+1):pocetPozorovani],1]
+        values[i,j+1-minGroupe] = fun(prvaPolovica,mean(prvaPolovica)) + fun(druhaPolovica, mean(druhaPolovica))
+      }
+    }
+  }
+  min = Inf
+  index =0
+  separate = 0
+  #najdenie najlepsieho rozdelenia dat
+  for (i in 1:pocetPremenych) {
+    for (j in (1):(pocetPozorovani-2*minGroupe+1)) {
+      if(min > values[i,j]){
+        min = values[i,j]
+        index = i
+        separate = j+(-1+minGroupe)
+      }
+    } 
+  }
+  
+  #nastavenie vetvenia
+  node$param = colnames(data)[index+1]
+  
+  if(is.character(data[1,node$param])){
+    node$compareValue = data[separate,node$param]
+    
+    node$less = createTreeRec2(data[data[,node$param]==node$compareValue,], fun, err, maxK -1,minGroupe)
+    node$egualesMore = createTreeRec2(data[data[,node$param]!=node$compareValue,], fun, err,maxK -1,minGroupe)
+  }else{
+    node$compareValue = (data[indexMatrix[index, separate],node$param]+data[indexMatrix[index, separate+1],node$param])/2
+    
+    node$less = createTreeRec2(data[i:separate,], fun, err, maxK -1,minGroupe)
+    node$egualesMore = createTreeRec2(data[(separate+1):pocetPozorovani,], fun, err,maxK -1,minGroupe)
+  }
+  
+  return(node)
+}
+
 
 #'      Funkcia, ktora vytvory regresny model 
 #' @param formula - zapisuje na v tvare "Y ~ X1 + X2 + ...",kde Y je zavisla premenna, a X1 ,X2 ,... su nezavysle premenne
@@ -75,7 +144,8 @@ createTree <- function(formula, data, fun = sse, err = 0.5, maxK = 100, minGroup
     pomIndexis[i,] = order(data2[,i+1])
   }
 
-  return(createTreeRec(data2, fun, err,maxK ,minGroupe,1,pocetPozorovani,pomIndexis))
+  #return(createTreeRec(data2, fun, err,maxK ,minGroupe,1,pocetPozorovani,pomIndexis))
+  return(createTreeRec2(data2, fun, err,maxK ,minGroupe))
 }
 
 #predikcia pomocou modelu pre jeden zaznam
@@ -84,8 +154,14 @@ predictionRec <-function(model, data){
     return(model$value)
   }
   
-  if(data[model$param] < model$compareValue){
-    return(predictionRec(model$less,data))
+  if(is.character(model$compareValue)){
+    if(data[model$param] == model$compareValue){
+      return(predictionRec(model$less,data))
+    }
+  }else{
+    if(data[model$param] < model$compareValue){
+     return(predictionRec(model$less,data))
+    }
   }
   return(predictionRec(model$egualesMore,data))
 }
@@ -106,4 +182,5 @@ model = createTree(Y ~ X1, test,fun=sse,maxK=50,minGroupe = 4)
 prediction(model, test)
 
 mse(test$Y,prediction(model, test))
+
 
