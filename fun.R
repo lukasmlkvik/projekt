@@ -5,86 +5,39 @@ sse <-function(a,b){
   return(sum((a-b)*(a-b)))
 }
 
+#rekurzivne vytvaranie rozdeleni
+createTreeRec<-function(trainData, fun = sse, err = 0.5, maxK = 100, minGroupe = 1){
+  pocetPremenych= ncol(trainData) -1
+  pocetPozorovani= nrow(trainData)
+  
 
-#pomocna funkcia aby sa zakazdym nemuseli kopirovat data a indexMatica, ale posle sa len referencia(ak to R tak robi) na data a interval
-createTreeRec<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1, start, end, indexMatrix){
-  pocetPozorovani = (end-start+1)
-  pocetPremenych = ncol(data) -1
   node=data.frame(1)
-  node$value = mean(data[start:end,1])
+  node$value = mean(trainData[,1])
   
   #podmienky pre ukoncenie vytvarania dalsieho vetvenia
-  if(err >= fun(data[start:end,1], node$value) || pocetPozorovani <= minGroupe*2 || maxK == 0){
+  if(err >= fun(trainData[,1], node$value) || pocetPozorovani <= minGroupe*2 || maxK == 0){
     return(node)
   }
   
-  #hodnoty chyby zo zadanej funkcie, pri rozdeleni dat na pozicii i(index 1 rozdeli data na minGroupe a zvysok)
+  #hodnoty chyby zo zadanej funkcie, pri rozdeleni dat na pozicii i(index 1 rozdeli trainData na minGroupe a zvysok)
   values = matrix(nrow = pocetPremenych, ncol = pocetPozorovani-2*minGroupe+1)
-  
-  #nastavenie hodnot pre kazde rozdelenie
-  for (i in 1:pocetPremenych) {
-    for (j in (minGroupe+start-1):(end-minGroupe)) {
-      values[i,j-start+2-minGroupe] = fun(data[indexMatrix[i,start:j],1],mean(data[indexMatrix[i,start:j],1])) +
-        fun(data[indexMatrix[i,(j+1):end],1], mean(data[indexMatrix[i,(j+1):end],1]))
-    }
-  }
-  min = Inf
-  index =0
-  separate = 0
-  #najdenie najlepsieho rozdelenia dat
-  for (i in 1:pocetPremenych) {
-    for (j in (1):(pocetPozorovani-2*minGroupe+1)) {
-      if(min > values[i,j]){
-        min = values[i,j]
-        index = i
-        separate = j+(start-2+minGroupe)
-      }
-    }
-  }
-  
-  #nastavenie vetvenia
-  node$param = colnames(data)[index+1]
-  node$compareValue = (data[indexMatrix[index, separate],node$param]+data[indexMatrix[index, separate+1],node$param])/2
-  
-  node$less = createTreeRec(data, fun, err, maxK -1,minGroupe,start,separate,indexMatrix)
-  node$egualesMore = createTreeRec(data, fun, err,maxK -1,minGroupe,separate+1,end,indexMatrix)
-  
-  return(node)
-}
-
-# Podbobna ako predchodza funkcia, akorat sa data vzdy kopituju, ale dokaze rozdelit data podla skupin
-createTreeRec2<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1){
-  
-  pocetPremenych= ncol(data) -1
-  pocetPozorovani= nrow(data)
-  
-  node=data.frame(1)
-  node$value = mean(data[,1])
-  
-  #podmienky pre ukoncenie vytvarania dalsieho vetvenia
-  if(err >= fun(data[,1], node$value) || pocetPozorovani <= minGroupe*2 || maxK == 0){
-    return(node)
-  }
-  
-  #hodnoty chyby zo zadanej funkcie, pri rozdeleni dat na pozicii i(index 1 rozdeli data na minGroupe a zvysok)
-  values = matrix(nrow = pocetPremenych, ncol = pocetPozorovani-2*minGroupe+1)
+  #matica indexov, zoradenie podla parametra
   indexMatrix = matrix(nrow = pocetPremenych, ncol = pocetPozorovani)
   
   #nastavenie hodnot pre kazde rozdelenie
   for (i in 1:pocetPremenych) {
-    indexMatrix[i,] = order(data[,i+1])
-    if(is.character(data[1,i+1])){
+    if(is.character(trainData[1,i+1])){
       for (j in (minGroupe):(pocetPozorovani-minGroupe)) {
-        filter = data[indexMatrix[i,1:pocetPozorovani],i+1]
         j_offset = j+1-minGroupe
-        prvaPolovica = data[indexMatrix[i,1:pocetPozorovani][filter==filter[j_offset]],1]
-        druhaPolovica = data[indexMatrix[i,1:pocetPozorovani][filter!=filter[j_offset]],1]
+        prvaPolovica = trainData[trainData[,i+1]==trainData[j_offset,i+1],1]
+        druhaPolovica = trainData[trainData[,i+1]!=trainData[j_offset,i+1],1]
         values[i,j_offset] = fun(prvaPolovica,mean(prvaPolovica)) + fun(druhaPolovica, mean(druhaPolovica))
       }
     }else{
+      indexMatrix[i,] = order(trainData[,i+1])
       for (j in (minGroupe):(pocetPozorovani-minGroupe)) {
-        prvaPolovica = data[indexMatrix[i,1:j],1]
-        druhaPolovica = data[indexMatrix[i,(j+1):pocetPozorovani],1]
+        prvaPolovica = trainData[indexMatrix[i,1:j],1]
+        druhaPolovica = trainData[indexMatrix[i,(j+1):pocetPozorovani],1]
         values[i,j+1-minGroupe] = fun(prvaPolovica,mean(prvaPolovica)) + fun(druhaPolovica, mean(druhaPolovica))
       }
     }
@@ -94,33 +47,35 @@ createTreeRec2<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1){
   separate = 0
   #najdenie najlepsieho rozdelenia dat
   for (i in 1:pocetPremenych) {
-    for (j in (1):(pocetPozorovani-2*minGroupe+1)) {
-      if(min > values[i,j]){
-        min = values[i,j]
-        index = i
-        separate = j+(-1+minGroupe)
+    for (j in (pocetPozorovani-2*minGroupe+1):(1)) {
+      if(min > values[i,j] ){
+        if(is.character(trainData[1,i+1]) || trainData[indexMatrix[i,j+(-1+minGroupe)],i+1]!=trainData[indexMatrix[i,j+(+minGroupe)],i+1]){
+          min = values[i,j]
+          index = i
+          separate = j+(-1+minGroupe)
+        }
       }
     } 
   }
   
   #ukoncenie vetvenia(toto vetvenie by nevytvorilo lepsi vysledok)
-  if(min >= fun(data[,1], node$value)){
+  if(min >= fun(trainData[,1], node$value)){
     return(node)
   }
   
   #nastavenie vetvenia
-  node$param = colnames(data)[index+1]
+  node$param = colnames(trainData)[index+1]
   
-  if(is.character(data[1,node$param])){
-    node$compareValue = data[separate,node$param]
+  if(is.character(trainData[1,node$param])){
+    node$compareValue = trainData[separate,node$param]
     
-    node$less = createTreeRec2(data[data[,node$param]==node$compareValue,], fun, err, maxK -1,minGroupe)
-    node$egualesMore = createTreeRec2(data[data[,node$param]!=node$compareValue,], fun, err,maxK -1,minGroupe)
+    node$less = createTreeRec(trainData[trainData[,node$param]==node$compareValue,], fun, err, maxK -1,minGroupe)
+    node$egualesMore = createTreeRec(trainData[trainData[,node$param]!=node$compareValue,], fun, err,maxK -1,minGroupe)
   }else{
-    node$compareValue = (data[indexMatrix[index, separate],node$param]+data[indexMatrix[index, separate+1],node$param])/2
+    node$compareValue = (trainData[indexMatrix[index, separate],node$param]+trainData[indexMatrix[index, separate+1],node$param])/2
     
-    node$less = createTreeRec2(data[i:separate,], fun, err, maxK -1,minGroupe)
-    node$egualesMore = createTreeRec2(data[(separate+1):pocetPozorovani,], fun, err,maxK -1,minGroupe)
+    node$less = createTreeRec(trainData[indexMatrix[index, 1:separate],], fun, err, maxK -1,minGroupe)
+    node$egualesMore = createTreeRec(trainData[indexMatrix[index, (separate+1):pocetPozorovani],], fun, err,maxK -1,minGroupe)
   }
   
   return(node)
@@ -134,23 +89,14 @@ createTreeRec2<-function(data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1){
 #' @param err - akceptovana chyby, ak je hodnota z fun nemcia, dane data sa dalej nerozdeluju
 #' @param maxK - maximalna hlbka stromu
 #' @param minGroupe - minimalna velkost mnoziny rozdelenych dat (aby nedoslo k pretrenovaniu)
+#' zdroj : https://www.youtube.com/watch?v=g9c66TUylZ4&t=1111s
 #' 
 createTree <- function(formula, data, fun = sse, err = 0.5, maxK = 100, minGroupe = 1){
   
   #filtrovanie len potrebnych dat
   data2 = model.frame(formula,data)
-  pocetPremenych= ncol(data2) -1
-  pocetPozorovani= nrow(data2)
 
-  
-  #matica indexov, zoradenie podla parametra
-  pomIndexis = matrix(nrow = pocetPremenych, ncol = pocetPozorovani)
-  for (i in 1:pocetPremenych) {
-    pomIndexis[i,] = order(data2[,i+1])
-  }
-
-  #return(createTreeRec(data2, fun, err,maxK ,minGroupe,1,pocetPozorovani,pomIndexis))
-  return(createTreeRec2(data2, fun, err,maxK ,minGroupe))
+  return(createTreeRec(data2, fun, err,maxK ,minGroupe))
 }
 
 #predikcia pomocou modelu pre jeden zaznam
@@ -173,23 +119,54 @@ predictionRec <-function(model, data){
 
 #predikcia pomocou modelu pre cely dataframe
 prediction <-function(model, data){
-  return(apply(data,1, FUN = function(x)predictionRec(model,x)))
+  pocetPozorovani = nrow(data)
+  vysledok = 1:pocetPozorovani
+  for (i in 1:pocetPozorovani) {
+    vysledok[i] = predictionRec(model,data[i,]) 
+  }
+  return(vysledok)
 }
 
+#vypisanie modelu
+printTree <- function(model, m=""){
+  if(is.null(model$param)){
+    print(paste(m,model$value))
+  }else{
+    print(paste(m,model$param, model$compareValue))
+    printTree(model$less,paste(m," |"));
+    printTree(model$egualesMore,paste(m,"  "));
+  }
+}
+
+#nacitanie a uprava modelu
 path <- 'https://raw.githubusercontent.com/guru99-edu/R-Programming/master/titanic_data.csv'
 titanic <-read.csv(path)
 titanic[1,]
+titanic$age=strtoi(titanic$age)
+titanic = titanic[!is.na(titanic$age),]
+titanic$fare=strtoi(titanic$fare)
+titanic[is.na(titanic$fare),"fare"] = 0
+titanic$pclass = paste(titanic$pclass)
 
+#rozdelenie na trenovacie a testovacie data
 titanicRand = sample(titanic)
-train = titanicRand[1:1000,]
-test = titanicRand[1001:1200,]
+train = titanicRand[1:700,]
+test = titanicRand[701:900,]
 
-model = createTree(survived ~ sex  + age + pclass , train,fun=sse,maxK=10,minGroupe = 5)
-model
+#vyhtorenie modelu a testovanie rychlosti
+zaciatok = Sys.time()
+model = createTree(survived ~ sex + age + pclass + fare, train,fun=sse,maxK=10,minGroupe = 20)
+Sys.time() - zaciatok
 
+printTree(model)
+
+#vytvorenie predikcii na testovacich datach
 vysledok  = prediction(model, test)
+#kedze zavizla premenna, ktoru chceme zistit je bud 0 alebo 1, tak vysledok predikcie sa zaokruhli
 pravdepodobnost = 0.5
 vysledok[vysledok<pravdepodobnost] = 0
 vysledok[vysledok>=pravdepodobnost] = 1
 
-mse(test$survived,vysledok)
+#kontrola presnosti modelu na testovacich datach
+table(vysledok,test$survived)
+
