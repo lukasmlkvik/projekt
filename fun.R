@@ -95,6 +95,14 @@ createTree <- function(formula, data, fun = sse, err = 0.5, maxK = 100, minGroup
   
   #filtrovanie len potrebnych dat
   data2 = model.frame(formula,data)
+  
+  for (i in 1:ncol(data2)) {
+    c = data2[1,i]
+    print(c)
+   if(!is.numeric(c)&&!is.character(c)&&!is.factor(c)){
+     stop("Bad columns!!!")
+   } 
+  }
 
   return(createTreeRec(data2, fun, err,maxK ,minGroupe))
 }
