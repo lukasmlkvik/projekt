@@ -2,7 +2,9 @@
 #install.packages("Rcpp", lib="G:/RLib")
 #library(Rcpp,lib.loc ="G:/RLib")
 
-
+###############################################################################################################
+#    deklaracia tried
+###############################################################################################################
 #tato instancia bude vytvorena iba v listoch stromu
 TreeNode <- setRefClass("TreeNode", 
   fields = c(
@@ -75,6 +77,9 @@ TreeNodeClassification <- setRefClass("TreeNodeClassification",
   )
 )
 
+###############################################################################################################
+#    deklaracia funkcii
+###############################################################################################################
 
 mse <-function(a,b){
   return(sum((a-b)*(a-b))/length(a))
@@ -184,6 +189,10 @@ createTree <- function(formula, data, fun = sse, err = 0.5, maxK = 100, minGroup
 
   return(createTreeRec(data2, fun, err,maxK ,minGroupe))
 }
+
+###############################################################################################################
+#    testovanie modelu na datach
+###############################################################################################################
 
 #nacitanie a uprava modelu
 path <- 'https://raw.githubusercontent.com/guru99-edu/R-Programming/master/titanic_data.csv'
